@@ -4,28 +4,22 @@ Library      RPA.Browser.Playwright
 Library      RPA.Excel.Files
 Library      RPA.FileSystem
 Library      RPA.PDF
-Library      Collections
-Library      String
+Library      data_parse
 
 
 *** Keywords ***
 Save Agency Budgets to Excel
-    ${agency_data}   Get Elements   //div[@id='agency-tiles-container']//div[@class='col-sm-12']
-    Log    ${agency_data}
-    ${rows}    Create List
     Create Directory    ${CURDIR}\\output
-    FOR  ${i}  IN  @{agency_data}
-        ${dept}    Get Text  ${i} >> //span[@class='h4 w200']
-        ${spend}    Get Text  ${i} >> //span[@class=' h1 w900']
-        ${row}    Create List  ${dept}  ${spend}
-        Append To List    ${rows}  ${row}
-    END
+    ${agency_data_html}    Get Property  //div[@id='agency-tiles-container']  property=outerHTML
+    Log    ${agency_data_html}
+    ${rows}    agency_spend  ${agency_data_html}
+    Log   ${rows} 
     Create Workbook    fmt=xlsx
     Create Worksheet    Agency_Spend
     Append Rows To Worksheet    ${rows}  Agency_Spend
     Save Workbook    ${CURDIR}\\output\\agencies.xlsx
     # Choose US Department of Commerce
-    Click    ${agency_data}[1]
+    Click    //div[@id='agency-tiles-container']//*[@alt="Seal of the Department of Commerce"]
 
 *** Keywords***
 Save Investments Table
@@ -35,27 +29,9 @@ Save Investments Table
         Exit For Loop If    ${page2_exists}==False
         Sleep    1s
     END
-    ${investment_data}    Get Elements   //div[@id="investments-table-container"]//tbody//tr
-    Log    ${investment_data}
-    ${rows}    Create List
-    FOR  ${i}  IN  @{investment_data}
-        ${UII}    Get Text  ${i} >> //td[1]
-        ${UII_link_exists}    Get Element State  ${i} >> //td[1]//a
-        IF  ${UII_link_exists}  
-            ${UII_url}    Get Attribute   ${i} >> //td[1]//a  href
-        ELSE
-             ${UII_url}    Set Variable 
-        END
-        ${Bureau}    Get Text  ${i} >> //td[2]
-        ${Investment_Title}    Get Text  ${i} >> //td[3]
-        ${Total_Spending}    Get Text  ${i} >> //td[4]
-        ${Type}    Get Text  ${i} >> //td[5]
-        ${CIO_Rating}    Get Text  ${i} >> //td[6]
-        ${Number_Of_Projects}    Get Text  ${i} >> //td[7]
-        ${row}    Create List  ${UII}  ${UII_url}  ${Bureau}  ${Investment_Title}  ${Total_Spending}  ${Type}  ${CIO_Rating}  ${Number_Of_Projects}
-        Log  ${row}
-        Append To List    ${rows}  ${row}
-    END
+    ${investment_data_html}    Get Property  //div[@id="investments-table-container"]//tbody  property=outerHTML
+    Log    ${investment_data_html}
+    ${rows}    investment_data  ${investment_data_html}
     Log    ${rows}
     Open Workbook    ${CURDIR}\\output\\agencies.xlsx
     Create Worksheet    IT_projects
@@ -78,16 +54,12 @@ Compare Values from PDF with Table
             ${text}    Get Text From PDF    ${CURDIR}\\output\\${project}[0].pdf
             # Find investment_name and Compare
             ${first_page}    Set Variable  ${text[1]}
-            ${investment_name_list}    Split String  ${first_page}  Name of this Investment:${space}
-            ${investment_name_list}    Split String  ${investment_name_list}[1]   2. 
-            ${investment_name}    Set Variable  ${investment_name_list}[0]
-            ${investment_name}    Replace String  ${investment_name}  \n  ${space}   
+            Log    ${first_page}
+            ${investment_name}  ${investment_name_list}    find_investment_name  ${first_page}
             ${investment_titles_compare}    Run Keyword and Return Status  
             ...    Should Be Equal  ${investment_name}  ${project}[3]
             # Find UII and Compare
-            ${uii_list}    Split String  ${investment_name_list}[1]  Unique Investment Identifier (UII):${space}
-            ${uii_list}    Split String  ${uii_list}[1]  Section
-            ${uii}    Set Variable  ${uii_list}[0]
+            ${uii}    find_uii  ${investment_name_list}
             ${uii_compare}    Run Keyword and Return Status  
             ...    Should Be Equal  ${uii}  ${project}[0]
         END
@@ -95,7 +67,7 @@ Compare Values from PDF with Table
 
 *** Tasks ***
 Extract data from IT dashboard
-    New Browser    chromium    headless=false
+    New Browser    chromium    headless=true
     New Context    acceptDownloads=True
     Set Browser Timeout    30
     Eat All Cookies
