@@ -58,10 +58,12 @@ Compare Values from PDF with Table
             ${investment_name}  ${investment_name_list}    find_investment_name  ${first_page}
             ${investment_titles_compare}    Run Keyword and Return Status  
             ...    Should Be Equal  ${investment_name}  ${project}[3]
+            Run Keyword If    ${investment_titles_compare}  Log    Investment Titles match
             # Find UII and Compare
             ${uii}    find_uii  ${investment_name_list}
             ${uii_compare}    Run Keyword and Return Status  
             ...    Should Be Equal  ${uii}  ${project}[0]
+            Run Keyword If    ${uii_compare}    Log    UIIs match
         END
     END
 
